@@ -698,4 +698,4 @@ def list2tuple_basics():
         }))
 
 
-__all__ = ['walk', 'ignore_assert', 'ignore_silently', 'unsupported', 'map_predicate2', 'map_predicate', 'identity', 'all_values_in']
+__all__ = ['walk', 'ignore_assert', 'ignore_silently', 'unsupported', 'map_predicate2', 'map_predicate', 'identity', 'all_values_in', 'list2tuple']
