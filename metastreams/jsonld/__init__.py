@@ -22,4 +22,4 @@
 #
 ## end license ##
 
-from .jsonldwalk3 import walk
+from .jsonldwalk3 import *

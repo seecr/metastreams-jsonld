@@ -696,3 +696,6 @@ def list2tuple_basics():
         schema+'identifier': [{'@id': 'urn:nbn:nl:hs:25-20.500.12470/10'}],
         schema+'dateModified': [{'@value': '2020-08-15T01:50:06.598316Z'}],
         }))
+
+
+__all__ = ['walk', 'ignore_assert', 'ignore_silently', 'unsupported', 'map_predicate2', 'map_predicate', 'identity', 'all_values_in']
