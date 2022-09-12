@@ -88,15 +88,12 @@ def compile(rules):
     if '*' in rules:
         default = rules['*']
     else:
+        keys = set(rules.keys()) if rules else {}
         def default(a,s,p=None,os=None):
-            keys = set(rules.keys()) if rules else {}
             e = LookupError(f"No rule for '{p}' in {keys}")
             e.subject = s if s is not None else os[0]  # called by __switch__ without subject
             raise e
-    if '__all__' in rules:
-        all_rule = rules['__all__']
-    else:
-        all_rule = None
+    all_rule = get('__all__')
 
     if '__key__' in rules:
         key_fn = rules['__key__']
@@ -123,7 +120,7 @@ def compile(rules):
     else:
         # this is the thinnest bottleneck
         def handle(accu, subject, predicate, objects, **opts):
-            if all_rule is not None:
+            if all_rule is not None: # TODO move this check to compile time (use exec to dynamically compile handle with/out all_rule)
                 accu = all_rule(accu, subject, predicate, objects)
             for subject in objects:
                 for __key__ in subject:
@@ -191,10 +188,10 @@ def map_predicate(p):
         return a
     return map_predicate_fn
 
-def map_predicate2(p):
+def map_predicate2(p, normalize=tuple):
     def map_predicate_fn(a,_,__,os):
         old = a.setdefault(p, ())
-        a[p] = old + tuple(os)
+        a[p] = old + normalize(os)
         return a
     return map_predicate_fn
 
@@ -697,5 +694,14 @@ def list2tuple_basics():
         schema+'dateModified': [{'@value': '2020-08-15T01:50:06.598316Z'}],
         }))
 
+@test
+def map_predicate2_normalize():
+    mp = map_predicate2('new_p')
+    test.eq({'a':({'@value': 'A'},), 'new_p':({'@value': 'p'},)},
+            mp({'a':({'@value': 'A'},),}, 's', 'p', [{'@value': 'p'}]))
+    mp = map_predicate2('new_p', lambda os: tuple({'@value':'Changed:'+w['@value']} for w in os))
+    test.eq({'a':({'@value': 'A'},), 'new_p':({'@value': 'Changed:p'},)},
+            mp({'a':({'@value': 'A'},),}, 's', 'p', [{'@value': 'p'}]))
 
-__all__ = ['walk', 'ignore_assert', 'ignore_silently', 'unsupported', 'map_predicate2', 'map_predicate', 'identity', 'all_values_in', 'list2tuple']
+
+__all__ = ['walk', 'ignore_assert', 'ignore_silently', 'unsupported', 'map_predicate2', 'map_predicate', 'identity', 'all_values_in', 'list2tuple', 'node_index']
