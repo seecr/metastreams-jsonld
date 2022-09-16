@@ -702,7 +702,7 @@ t2l_walk = walk({
         '*': t2l_fn
     })
 def tuple2list(d):
-    return t2l_walk(d) if type(d) is dict else d
+    return t2l_walk(d) if isinstance(d, dict) else d
 
 
 @test
@@ -732,6 +732,12 @@ def tuple2list_basics():
             schema+'dateModified': ({'@value': '2020-08-15T01:50:06.598316Z', '@type': 'dateString', '@language': 'nl'},),
             schema+'object':({'@type': (schema+'Thing',)},),
         }), msg=test.diff2)
+
+
+@test
+def tuple2list_subclass():
+    class D(dict): pass
+    test.eq({'a': [{'b': []}]}, tuple2list(D(a=(D(b=()),))))
 
 
 @test
