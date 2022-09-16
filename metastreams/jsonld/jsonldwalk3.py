@@ -694,6 +694,46 @@ def list2tuple_basics():
         schema+'dateModified': [{'@value': '2020-08-15T01:50:06.598316Z'}],
         }))
 
+
+def t2l_fn(a,s,p,os):
+    a[p] = list(tuple2list(o) for o in os) if isinstance(os, (tuple, list)) else os
+    return a
+t2l_walk = walk({
+        '*': t2l_fn
+    })
+def tuple2list(d):
+    return t2l_walk(d) if type(d) is dict else d
+
+
+@test
+def tuple2list_basics():
+    d = {}
+    d1 = tuple2list(d)
+    test.eq({}, d1)
+    test.ne(id(d), id(d1))
+
+    d = {1: (1,), 3: ['iets']}
+    td = tuple2list(d)
+    d[3].append('anders')
+    test.eq({1: [1], 3: ['iets']}, td)
+    test.eq(       {1: [1 ]},
+        tuple2list({1: (1,)}))
+    test.eq(       {1: [{2: []}, {3: [2, 3]}]},
+        tuple2list({1: ({2: ()}, {3: (2, 3)})}))
+    test.eq({
+        'http://schema.org/identifier': [{'@id': 'urn:nbn:nl:hs:25-20.500.12470/10'}],
+        'http://schema.org/dateModified': [{'@value': '2020-08-15T01:50:06.598316Z',
+                                            '@type': 'dateString',
+                                            '@language': 'nl'}],
+        'http://schema.org/object':[{'@type': ['http://schema.org/Thing']}],
+        },
+        tuple2list({
+            schema+'identifier': ({'@id': 'urn:nbn:nl:hs:25-20.500.12470/10'},),
+            schema+'dateModified': ({'@value': '2020-08-15T01:50:06.598316Z', '@type': 'dateString', '@language': 'nl'},),
+            schema+'object':({'@type': (schema+'Thing',)},),
+        }), msg=test.diff2)
+
+
 @test
 def map_predicate2_normalize():
     mp = map_predicate2('new_p')
@@ -704,4 +744,4 @@ def map_predicate2_normalize():
             mp({'a':({'@value': 'A'},),}, 's', 'p', [{'@value': 'p'}]))
 
 
-__all__ = ['walk', 'ignore_assert', 'ignore_silently', 'unsupported', 'map_predicate2', 'map_predicate', 'identity', 'all_values_in', 'list2tuple', 'node_index']
+__all__ = ['walk', 'ignore_assert', 'ignore_silently', 'unsupported', 'map_predicate2', 'map_predicate', 'identity', 'all_values_in', 'list2tuple', 'node_index', 'tuple2list']
