@@ -206,7 +206,8 @@ def append(a,s,p,os):
 
 
 
-from autotest import test
+import autotest
+test = autotest.get_tester(__name__)
 
 @test
 def simple_basics():
@@ -607,7 +608,7 @@ def insert_predicate():
     test.eq({schema+'publisher': [{schema+'name': [{'@value': 'Aap'}]}, {schema+'name': [{'@value': 'noot'}]}]}, m)
 
     m = walk_one({dcterms+'publisher': [{'@value': 'Aap'}, {dcterms+'title': [{'@value': 'noot'}]}]})
-    test.eq({schema+'publisher': [{schema+'name': [{'@value': 'Aap'}]}, {schema+'name': [{'@value': 'noot'}]}]}, m, msg=test.diff)
+    test.eq({schema+'publisher': [{schema+'name': [{'@value': 'Aap'}]}, {schema+'name': [{'@value': 'noot'}]}]}, m, diff=test.diff)
 
     m = walk_one({dcterms+'publisher': [{schema+'about': [{'@value': 'noot'}]}, {'@value': 'Aap'}]})
     test.eq({schema+'publisher': [{schema+'about': [{'@value': 'noot'}]}, {schema+'name': [{'@value': 'Aap'}]}]}, m)
@@ -731,7 +732,7 @@ def tuple2list_basics():
             schema+'identifier': ({'@id': 'urn:nbn:nl:hs:25-20.500.12470/10'},),
             schema+'dateModified': ({'@value': '2020-08-15T01:50:06.598316Z', '@type': 'dateString', '@language': 'nl'},),
             schema+'object':({'@type': (schema+'Thing',)},),
-        }), msg=test.diff2)
+        }), diff=test.diff2)
 
 
 @test
