@@ -89,7 +89,7 @@ def compile(rules):
         default = rules['*']
     else:
         keys = set(rules.keys()) if rules else {}
-        def default(a,s,p=None,os=None):
+        def default(a,s,p=None,os=None, **opts):
             e = LookupError(f"No rule for '{p}' in {keys}")
             e.subject = s if s is not None else os[0]  # called by __switch__ without subject
             raise e
@@ -97,31 +97,31 @@ def compile(rules):
 
     if '__key__' in rules:
         key_fn = rules['__key__']
-        def handle(accu, subject, predicate, objects):
+        def handle(accu, subject, predicate, objects, **opts):
             if all_rule is not None:
-                accu = all_rule(accu, subject, predicate, objects)
+                accu = all_rule(accu, subject, predicate, objects, **opts)
             for subject in objects:
                 for predicate in subject:
                     objects = subject[predicate]
                     __key__ = key_fn(accu, subject, predicate, objects)
-                    accu = get(__key__, default)(accu, subject, predicate, objects)
+                    accu = get(__key__, default)(accu, subject, predicate, objects, **opts)
             return accu
 
     elif '__switch__' in rules:
         switch_fn = rules['__switch__']
-        def handle(accu, subject, predicate, objects):
+        def handle(accu, subject, predicate, objects, **opts):
             if all_rule is not None:
-                accu = all_rule(accu, subject, predicate, objects)
+                accu = all_rule(accu, subject, predicate, objects, **opts)
             for subject in objects:
                 __key__ = switch_fn(accu, subject)
-                accu = get(__key__, default)(accu, None, None, (subject,))
+                accu = get(__key__, default)(accu, None, None, (subject,), **opts)
             return accu
 
     else:
         # this is the thinnest bottleneck
         def handle(accu, subject, predicate, objects, **opts):
             if all_rule is not None: # TODO move this check to compile time (use exec to dynamically compile handle with/out all_rule)
-                accu = all_rule(accu, subject, predicate, objects)
+                accu = all_rule(accu, subject, predicate, objects, **opts)
             for subject in objects:
                 for __key__ in subject:
                     accu = get(__key__, default)(accu, subject, __key__, subject[__key__], **opts)
@@ -316,11 +316,41 @@ def my_accu_plz():
     test.eq(id_a, id(r))
 
 
-#@test
-def pass_args():
-    r = Walk({'*': lambda a,s,p,os,x,y,z=42: a | {'x': x, 'y': y, 'z': z}}).subject({1:2},3,4,z=5)
-    test.eq({'x': 3, 'y': 4, 'z': 5}, r)
+@test
+def pass_kwargs():
+    def accept_kwargs(a,s,p,os, **opts):
+        return a|{p:{'os':os, 'opts':opts}}
+    w = walk({
+        'aap': accept_kwargs,
+    })
+    r = w({'aap':('AAP',)}, kwarg='something')
+    test.eq({'aap':{'os':('AAP',), 'opts':{'kwarg':'something'}}}, r, diff=test.diff2)
 
+    w = walk({
+        '__key__': lambda a,s,p,os: 'key:'+p,
+        'key:aap': accept_kwargs,
+    })
+    r = w({'aap':('AAP',)}, kwarg='something')
+    test.eq({'aap':{'os':('AAP',), 'opts':{'kwarg':'something'}}}, r, diff=test.diff2)
+
+    w = walk({
+        '__switch__': lambda a,s: 'switched',
+        'switched':{
+            'aap': accept_kwargs,
+        }
+    })
+    r = w({'aap':('AAP',)}, kwarg='something')
+    test.eq({'aap':{'os':('AAP',), 'opts':{'kwarg':'something'}}}, r, diff=test.diff2)
+
+    w = walk({
+        '__all__': lambda a,s,p,os,**opts: a|{'all_opts':opts},
+        'aap': accept_kwargs,
+    })
+    r = w({'aap':('AAP',)}, kwarg='something')
+    test.eq({
+        'aap':{'os':('AAP',), 'opts':{'kwarg':'something'}},
+        'all_opts': {'kwarg':'something'},
+        }, r, diff=test.diff2)
 
 @test
 def append_to_list():
@@ -750,5 +780,22 @@ def map_predicate2_normalize():
     test.eq({'a':({'@value': 'A'},), 'new_p':({'@value': 'Changed:p'},)},
             mp({'a':({'@value': 'A'},),}, 's', 'p', [{'@value': 'p'}]))
 
+@test
+def test_key_to_change_something():
+    rules = {
+            '__key__': lambda a,s,p,os: 'start' if p.startswith('start') else p,
+            'start': map_predicate2('A'),
+            'other': map_predicate2('B'),
+        }
+    w = walk(rules)
+    a = w({
+        'start.aap':[{'@value':'aap'}],
+        'start.noot':[{'@value':'noot'}],
+        'other':[{'@value':'mies'}],
+    })
+    test.eq({
+        'A': ({'@value': 'aap'}, {'@value': 'noot'}),
+        'B': ({'@value': 'mies'},)
+    }, a, diff=test.diff)
 
 __all__ = ['walk', 'ignore_assert', 'ignore_silently', 'unsupported', 'map_predicate2', 'map_predicate', 'identity', 'all_values_in', 'list2tuple', 'node_index', 'tuple2list']
