@@ -22,7 +22,7 @@
 #
 ## end license ##
 
-from .jsonldwalk3 import walk
+from .jsonldwalk3 import walk, ignore_silently
 import pytest
 
 
@@ -80,18 +80,132 @@ def test_default_rule():
 def test_values():
     r = []
     rules = {
-            '@value': lambda *a: r.append(a), # returns None
-            '*'     : lambda *a: r.append(a),
-            }
+        "@value": lambda *a: r.append(a),  # returns None
+        "*": lambda *a: r.append(a),
+    }
     w = walk(rules)
-    s = {'@value': "hello",
-         'b/b': [{'id': '16'}]}
+    s = {"@value": "hello", "b/b": [{"id": "16"}]}
     w(s)
-    assert r.pop() == (None, s, 'b/b', [{'id': '16'}])
-    assert r.pop() == ({}, s, '@value', "hello")
+    assert r.pop() == (None, s, "b/b", [{"id": "16"}])
+    assert r.pop() == ({}, s, "@value", "hello")
 
     # should have same result
-    w = walk({'a': rules})
-    w({'a': [s]})
-    assert r.pop() == (None, s, 'b/b', [{'id': '16'}])
-    assert r.pop() == ({}, s, '@value', "hello")
+    w = walk({"a": rules})
+    w({"a": [s]})
+    assert r.pop() == (None, s, "b/b", [{"id": "16"}])
+    assert r.pop() == ({}, s, "@value", "hello")
+
+
+def test_modifying_input_is_not_allowed():
+    r = []
+    rules = {
+        "a/a": lambda a, s, p, o: r.append(s.pop("a/b") * o),
+        "a/b": ignore_silently,
+    }
+    j0 = {"a/b": 2, "a/a": 42}
+    with pytest.raises(Exception) as e:
+        walk(rules)(j0)
+    assert str(e.value).startswith(
+        "RuntimeError: dictionary changed size during iteration at:"
+    )
+
+
+def test_reduce_returned_values():
+    j = {"a": 42, "b": 16}
+    r = walk({"a": lambda a, s, p, o: o, "*": lambda a, s, p, o: [42, (p, o)]})(j)
+    assert r == [42, ("b", 16)]
+
+
+def test_my_accu_plz():
+    a = {}
+    id_a = id(a)
+    r = walk({"*": lambda a, s, p, os: a})({"a": 10}, accu=a)
+    assert id(r) == id_a
+
+
+def test_pass_kwargs():
+    def accept_kwargs(a, s, p, os, **opts):
+        return a | {p: {"os": os, "opts": opts}}
+
+    w = walk(
+        {
+            "aap": accept_kwargs,
+        }
+    )
+    r = w({"aap": ("AAP",)}, kwarg="something")
+    assert r == {"aap": {"os": ("AAP",), "opts": {"kwarg": "something"}}}
+
+    w = walk(
+        {
+            "__key__": lambda a, s, p, os: "key:" + p,
+            "key:aap": accept_kwargs,
+        }
+    )
+    r = w({"aap": ("AAP",)}, kwarg="something")
+    assert r == {"aap": {"os": ("AAP",), "opts": {"kwarg": "something"}}}
+
+    w = walk(
+        {
+            "__switch__": lambda a, s: "switched",
+            "switched": {
+                "aap": accept_kwargs,
+            },
+        }
+    )
+    r = w({"aap": ("AAP",)}, kwarg="something")
+    assert r == {"aap": {"os": ("AAP",), "opts": {"kwarg": "something"}}}
+
+    w = walk(
+        {
+            "__all__": lambda a, s, p, os, **opts: a | {"all_opts": opts},
+            "aap": accept_kwargs,
+        }
+    )
+    r = w({"aap": ("AAP",)}, kwarg="something")
+    assert r == {
+        "aap": {"os": ("AAP",), "opts": {"kwarg": "something"}},
+        "all_opts": {"kwarg": "something"},
+    }
+
+
+def test_append_to_list():
+    def append(a, s, p, os):
+        a.setdefault(p, []).extend(os)
+        return a
+
+    w = walk({"*": append})
+    r = w({"a": [1]})
+    r = w({"a": [2]}, accu=r)
+    assert r == {"a": [1, 2]}
+
+
+def test_custom_key():
+    r = []
+    q = []
+    rules = {
+        "__key__": lambda *a: r.append(a),  # returns None
+        None: lambda *a: q.append(a),
+    }
+    w = walk(rules)
+    w({"a": 42})
+    assert r.pop() == ({}, {"a": 42}, "a", 42)
+    assert q.pop() == ({}, {"a": 42}, "a", 42)
+
+    # should have same results
+    w = walk({"b": rules})
+    w({"b": [{"a": 42}]})
+    assert r.pop() == ({}, {"a": 42}, "a", 42)
+    assert q.pop() == ({}, {"a": 42}, "a", 42)
+
+    # should have same results
+    w = walk({"b": rules, "__key__": lambda a, s, p, os: p})
+    w({"b": [{"a": 42}]})
+    assert r.pop() == ({}, {"a": 42}, "a", 42)
+    assert q.pop() == ({}, {"a": 42}, "a", 42)
+
+
+def test_custom_key_with_subwalk():
+    r = []
+    w = walk({"__key__": lambda a, s, p, os: p, "a": {"b": lambda *a: r.append(a)}})
+    w({"a": [{"b": "identiteit"}]})
+    assert r.pop() == ({}, {"b": "identiteit"}, "b", "identiteit")
