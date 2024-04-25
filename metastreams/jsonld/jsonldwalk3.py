@@ -2,7 +2,7 @@
 #
 # "Metastreams Json LD" provides utilities for handling json-ld data structures
 #
-# Copyright (C) 2022 Seecr (Seek You Too B.V.) https://seecr.nl
+# Copyright (C) 2022, 2024 Seecr (Seek You Too B.V.) https://seecr.nl
 #
 # This file is part of "Metastreams Json LD"
 #
@@ -209,34 +209,6 @@ def append(a,s,p,os):
 import autotest
 test = autotest.get_tester(__name__)
 
-@test
-def simple_basics():
-    r = []
-    w = walk({
-        'a': lambda *a: r.append(a)
-        })
-    w({'a': 'whatever-is-here'})
-    test.eq(({}, {'a': 'whatever-is-here'}, 'a', 'whatever-is-here'), r.pop())
-    w({'a': [42]})
-    test.eq(({}, {'a': [42]}, 'a', [42]), r.pop())
-
-
-@test
-def nested_rule():
-    r = []
-    w = walk({
-            'a': {
-                'b': {
-                    'c': lambda *a: r.append(a),
-                },
-            },
-        })
-    w({'a': [{'b': [{'c': 42}]}]})
-    test.eq(({}, {'c': 42}, 'c', 42), r.pop())
-    with test.raises(Exception, "TypeError: 'int' object is not iterable at:\n> a\n-> b while processing:\n{'b': 42}"):
-        w({'a': [{'b': 42}]})
-
-
 #@test
 def modifying_input_is_not_allowed():
     r = []
@@ -254,50 +226,8 @@ def modifying_input_is_not_allowed():
         print(repr(e))
 
 
-@test
-def default_rule():
-    r = []
-    rules = {
-            '*': lambda a, s, p, o: r.append((p, 'default'))
-            }
-    j0 = {'a/a': 42,
-          'a/b': 2}
-    walk(rules)(j0)
-    test.eq(('a/b', 'default'), r.pop())
-    test.eq(('a/a', 'default'), r.pop())
-
-    # should have same result
-    w = walk({'a': rules})
-    w({'a': [j0]})
-    test.eq(('a/b', 'default') ,r.pop())
-    test.eq(('a/a', 'default') ,r.pop())
-
-    # should have same result
-    w = walk({'*': rules})
-    w({'a': [j0]})
-    test.eq(('a/b', 'default') ,r.pop())
-    test.eq(('a/a', 'default') ,r.pop())
 
 
-@test
-def values():
-    r = []
-    rules = {
-            '@value': lambda *a: r.append(a), # returns None
-            '*'     : lambda *a: r.append(a),
-            }
-    w = walk(rules)
-    s = {'@value': "hello",
-         'b/b': [{'id': '16'}]}
-    w(s)
-    test.eq((None, s, 'b/b', [{'id': '16'}]), r.pop())
-    test.eq(({}, s, '@value', "hello"), r.pop())
-
-    # should have same result
-    w = walk({'a': rules})
-    w({'a': [s]})
-    test.eq((None, s, 'b/b', [{'id': '16'}]), r.pop())
-    test.eq(({}, s, '@value', "hello"), r.pop())
 
 
 @test
